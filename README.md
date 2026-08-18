@@ -1,45 +1,45 @@
-# ATI HD 5000 DisplayPort patcher
+# DisplayPort Fix on OS X Snow Leopard and Lion for ATI 5000 series GPUs
 
-Copyright © by Michael McSky 2026 - CC BY-NC-SA 4.0 License
+*Copyright © by Michael McSky 2026 - CC BY-NC-SA 4.0 License*
 
 Issue:
-OS X Snow Leopard 10.6.8 has no working DisplayPort output with the native
-ATI 5000 driver stack when using a regular PC ATI 5000 series GPU.
-Lion 10.7.5 can initialize DisplayPort, but fails to reactivate it after
-hotplug and sleep/wake.
-The DP pixel clock remains off and the display stays black.
+OS X **Snow Leopard 10.6.8** has **no working DisplayPort output** with the native
+ATI 5000 driver stack when using a **regular PC ATI 5000 series GPU**.
+Lion **10.7.5** can initialize DisplayPort, but **fails** to reactivate it after
+**hotplug and sleep/wake**.
+The DP pixel clock remains off and the display **stays black**.
 This patch was developed and tested on a Hackintosh using a PC version of an
 ATI Radeon HD 5000 series GPU. No conclusions are made about the behavior
 of genuine Macs using Apple/Mac Edition graphics cards.
 
-This fix:
-This patch fixes these DisplayPort problems specifically for
-OS X Snow Leopard 10.6.8 and OS X Lion 10.7.5.
+**This fix:**
+This patch **fixes these DisplayPort problems** specifically for
+OS X **Snow Leopard 10.6.8** and OS X **Lion 10.7.5**.
 Snow Leopard receives the tested Lion display core compatibility changes
-together with the 0xff PPLL guard fix.
-Lion receives the 0xff PPLL guard fix required to restore DisplayPort
-after hotplug and sleep/wake.
+together with the **0xff PPLL guard fix**.
+Lion receives the 0xff PPLL guard fix required to **restore DisplayPort
+after hotplug and sleep/wake**.
 
 The behavior of genuine Macs with Apple/Mac Edition graphics cards was not
 tested. It is possible that the patch could also help such systems, but this
 has not been verified.
 
-One might ask why a patch is still being made for such old hardware and
+*One might ask why a patch is still being made for such old hardware and
 operating systems. Many older macOS projects can only be opened and edited
 correctly with the original software, plugins and system versions. Snow
 Leopard and Lion work very well with Radeon HD 5000 series cards, which are
 still easy and inexpensive to find on the used market. This makes it possible
 to build a fast and practical Retro Mac or Hackintosh system with older
 hardware. With this patch, such a Retro system can also use DisplayPort, making
-old hardware much easier to use with modern monitors today.
+old hardware much easier to use with modern monitors today.*
 
-This package builds, installs and restores the tested DisplayPort fixes for:
+**This package builds, installs and restores the tested DisplayPort fixes for:**
 
 - OS X Snow Leopard 10.6.8
 - OS X Lion 10.7.5 / 11G63
 
-The patch is expected to be applicable to these PC versions of ATI Radeon HD
-5000 series graphics cards:
+**The patch is expected to be applicable to these PC versions of ATI Radeon HD
+5000 series graphics cards:**
 
 - ATI Radeon HD 5770 (OutOfTheBox)
 - ATI Radeon HD 5870 (OutOfTheBox)
@@ -57,6 +57,9 @@ auto-detect the operating system and never reads kexts directly from
 Place the original source kext bundle(s) in `YourKextSource/`.
 
 For the Snow Leopard patch, use the complete OS X 10.7.2 GM2 / 11C74 bundles:
+
+The sizes below are bundle payload sizes as calculated by the patcher
+(regular-file bytes plus stored symbolic-link sizes).
 
 - `ATISupport.kext` — 3527235 bytes
 - `ATIFramebuffer.kext` — 301392 bytes
@@ -98,7 +101,7 @@ For a non-destructive validation first use:
     python installKextOnSystem.py --dry-run
 
 The installer reads the explicit target from `PATCH-MANIFEST.txt`, then
-independently verifies the expected kext set, bundle metadata, sizes and golden
+independently verifies the expected kext set, bundle metadata, exact bundle payload sizes and golden
 SHA-256 hashes. On the real target system it also checks the installed system
 binary hashes before any replacement.
 
@@ -117,7 +120,7 @@ backup directory.
 Before the first active system kext is changed, the installer copies and
 verifies the complete current target kext set into that directory. The backup
 normally contains `BACKUP-MANIFEST.txt`, which records the exact bundle version,
-bundle size and SHA-256 of every backed-up system kext. If the manifest is later
+bundle payload size and SHA-256 of every backed-up system kext. If the manifest is later
 deleted, restore mode can still independently identify a complete built-in
 trusted backup state as described below.
 
@@ -130,7 +133,7 @@ with `/usr/bin/sudo -v`. Failed authentication aborts before `/System/Library/Ex
 is modified.
 
 The new kexts are then staged and revalidated for bundle identity, version,
-exact bundle size and binary SHA-256 before installation. The same checks are
+exact bundle payload size and binary SHA-256 before installation. The same checks are
 repeated after activation. The installer does not perform an automatic rollback.
 The verified target-specific backup remains the explicit recovery path through
 `python installKextOnSystem.py --restore`.
@@ -627,7 +630,7 @@ These are the principal tested binary SHA-256 values:
 | SL | `ATI5000Controller` | `89d9de079da9260d2480aba68e7aba15f6fdcf4f474f21493cc78e1854a1b780` | `8e14084aac4156095f966957a9473496943db084a6fc230d6f08711adbea2fb1` |
 | Lion | `ATI5000Controller` | `b9a6866844953c593a0bd479f47fdf3e8f9435cb9fb9c1e0bc3dee94cd68dd4d` | `07b59562d17eb647384e7898505b6abf340d286dc8168859c91d8d6095d363ac` |
 
-For the Snow Leopard target, the patcher also validates the complete bundle
+For the Snow Leopard target, the patcher also validates the exact bundle payload
 sizes of the selected 11C74 source bundles:
 
 ```text
@@ -643,7 +646,7 @@ ATI5000Controller.kext   697826 bytes
 ```
 
 For installer system-state verification, the untouched Snow Leopard 10.6.8 /
-10K549 bundles have these tested payload sizes:
+10K549 bundles have these tested bundle payload sizes:
 
 ```text
 ATISupport.kext          3399537 bytes
@@ -658,7 +661,7 @@ ATI bundles contain four legacy code-signature links whose stored payloads total
 when the same entries are preserved as symbolic links or materialized as small
 regular files by older tools/filesystems.
 
-Bundle-size validation matters because the Lion installer media can contain
+Bundle payload size validation matters because the Lion installer media can contain
 same-named extraction candidates that are not complete bundles. A matching
 Mach-O binary hash alone is not enough to prove that the complete source kext
 was selected.
@@ -705,7 +708,7 @@ This explains why the two supported targets are intentionally different:
 - Lion 10.7.5 already has the required display core and needs only the `0xff`
   PPLL guard fix in `ATI5000Controller`.
 
-The package therefore validates exact known versions, bundle sizes, hashes and
+The package therefore validates exact known versions, bundle payload sizes, hashes and
 patch patterns. It is not a generic "ATI 5000 binary patcher" for arbitrary OS
 X releases or arbitrary controller binaries.
 
@@ -732,7 +735,7 @@ installation. The patcher and dry-run mode never create this folder.
 `BACKUP-MANIFEST.txt` is the normal verification record, but it is not required
 for recovery. If the manifest is missing, the installer independently checks all
 backup kexts against the complete built-in trusted states. Restore continues only
-when bundle identifiers, executables, versions, exact bundle sizes and SHA-256
+when bundle identifiers, executables, versions, exact bundle payload sizes and SHA-256
 hashes identify one complete known pre-install state.
 
 The known restore states are:
@@ -755,7 +758,7 @@ being applied merely because both sides happen to contain individually known
 kext hashes.
 
 The backup bundles are staged into temporary non-kext paths first and their
-bundle identity, version, exact size and binary SHA-256 are checked again. The
+bundle identity, version, exact bundle payload size and binary SHA-256 are checked again. The
 current target bundles are then replaced by the verified backup bundles.
 Automatic rollback is intentionally not used. If the restore is interrupted or
 a cache command fails after replacement has started, the installer reports that
@@ -840,3 +843,5 @@ installer backup and any separately stored originals on external storage before
 making further system changes.
 
 After a successful install or restore, restart the system.
+
+*Copyright © by Michael McSky 2026 - CC BY-NC-SA 4.0 License*
