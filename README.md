@@ -65,13 +65,17 @@ The sizes below are bundle payload sizes as calculated by the patcher
 - `ATIFramebuffer.kext` — 301392 bytes
 - `ATI5000Controller.kext` — 674665 bytes
 
-For the Lion patch, copy this bundle manually from a clean OS X Lion 10.7.5 /
-11G63 `/System/Library/Extensions` directory:
+For the Lion file-based patch, copy this bundle manually from a clean OS X Lion
+10.7.5 / 11G63 `/System/Library/Extensions` directory:
 
 - `ATI5000Controller.kext` — CFBundleVersion 7.3.2 — 697826 bytes
 
 The patcher additionally verifies bundle identity, exact binary SHA-256 and the
 expected patch pattern. A kext from the wrong target or build is rejected.
+
+If you use the optional OpenCore method for Lion described in section 3.1, no
+Lion source kext has to be placed in `YourKextSource/`; the fix can be applied
+directly at boot with `Kernel -> Patch`.
 
 ## 2. Build the patch
 
@@ -89,6 +93,9 @@ To validate everything without creating `FinalPatchedKext/`:
 
 A real build creates `FinalPatchedKext/` with the patched kext(s),
 `PATCH-MANIFEST.txt`, `PATCH-REPORT.txt` and `SHA256SUMS.txt`.
+
+For Lion, this build step is only required for the file-based installation
+method. It can be skipped when using the optional OpenCore patch in section 3.1.
 
 ## 3. Install
 
@@ -156,11 +163,92 @@ guard rewrite described below modifies only the x86_64 controller slice;
 an i386 kernel is therefore intentionally rejected by the installer.
 
 The Lion installation is intentionally limited to OS X Lion 10.7.5 / 11G63.
-It replaces only `ATI5000Controller.kext`.
+It replaces only `ATI5000Controller.kext`. The optional OpenCore method below
+applies the same controller fix at boot without replacing the on-disk kext.
 
 The Snow Leopard installation replaces the tested three-kext patch set. A known
 earlier Snow Leopard hybrid state is recognized and only the controller is
 updated when appropriate.
+
+### 3.1 Optional Lion OpenCore patch (no `/S/L/E` replacement)
+
+For OS X Lion 10.7.5 / 11G63, installing the patched
+`ATI5000Controller.kext` into `/System/Library/Extensions` is optional. Lion
+needs only the 23-byte PPLL guard rewrite, so OpenCore can apply the same binary
+replacement at boot through `Kernel -> Patch`. The original Apple kext can stay
+unchanged on disk.
+
+This OpenCore method is intended only for the Lion target. Snow Leopard still
+needs the complete tested three-kext Lion display-core backport and therefore
+uses the file-based patcher/installer described above.
+
+Before switching to the OpenCore method, restore the original Apple Lion
+10.7.5 / 11G63 `ATI5000Controller.kext` and rebuild the system kext caches. Do
+not use the file-patched controller and the OpenCore patch at the same time.
+
+Add the following dictionary to the `Kernel -> Patch` array in OpenCore's
+`config.plist`:
+
+```xml
+<dict>
+    <key>Arch</key>
+    <string>x86_64</string>
+    <key>Base</key>
+    <string></string>
+    <key>Comment</key>
+    <string>ATI5000Controller DP PPLL 0xff fix - Lion 10.7.5</string>
+    <key>Count</key>
+    <integer>1</integer>
+    <key>Enabled</key>
+    <true/>
+    <key>Find</key>
+    <data>QYD+Ag+HiwAAAEGI90mJ/EEPtvdMiec=</data>
+    <key>Identifier</key>
+    <string>com.apple.kext.ATI5000Controller</string>
+    <key>Limit</key>
+    <integer>0</integer>
+    <key>Mask</key>
+    <data></data>
+    <key>MaxKernel</key>
+    <string>11.99.99</string>
+    <key>MinKernel</key>
+    <string>11.0.0</string>
+    <key>Replace</key>
+    <data>RIjw/sA8Aw+HiAAAAEGJ90mJ/JCQkJA=</data>
+    <key>ReplaceMask</key>
+    <data></data>
+    <key>Skip</key>
+    <integer>0</integer>
+</dict>
+```
+
+The same entry in an OpenCore editor such as OCAT uses these values:
+
+```text
+Arch:        x86_64
+Base:        <empty>
+Comment:     ATI5000Controller DP PPLL 0xff fix - Lion 10.7.5
+Count:       1
+Enabled:     True
+Identifier:  com.apple.kext.ATI5000Controller
+Find:        41 80 FE 02 0F 87 8B 00 00 00 41 88 F7 49 89 FC 41 0F B6 F7 4C 89 E7
+Mask:        <empty>
+MaxKernel:   11.99.99
+MinKernel:   11.0.0
+Replace:     44 88 F0 FE C0 3C 03 0F 87 88 00 00 00 41 89 F7 49 89 FC 90 90 90 90
+ReplaceMask: <empty>
+Limit:       0
+Skip:        0
+```
+
+The `Find` and `Replace` data are exactly the same tested 23-byte sequence
+documented below. The entry is restricted to `x86_64`, targeted at
+`com.apple.kext.ATI5000Controller` and limited to Darwin 11.x. The project is
+still tested specifically on OS X Lion 10.7.5 / 11G63.
+
+With this method the Apple kext in `/System/Library/Extensions` remains
+original. The DisplayPort fix can be disabled simply by disabling this
+OpenCore patch entry.
 
 ## 4. Technical background and patch internals
 
@@ -617,6 +705,9 @@ i386 slice start:              0x54000
 ```
 
 Only the x86_64 slice is modified. The i386 slice remains byte-identical.
+The same tested 23-byte replacement can alternatively be applied at boot with
+OpenCore `Kernel -> Patch` as described in section 3.1, leaving the original
+Lion controller bundle unchanged in `/System/Library/Extensions`.
 
 ### 4.7 Binary identities used by the patcher
 

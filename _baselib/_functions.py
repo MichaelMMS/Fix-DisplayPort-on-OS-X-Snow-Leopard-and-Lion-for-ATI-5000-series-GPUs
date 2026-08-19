@@ -307,8 +307,8 @@ def print_basic_help(program, dry_run_text, version_text):
 def validate_kext_identity(bundle_path, spec, expected_version, error_type=None):
     """Validate common Info.plist identity fields and return core paths/version."""
     error_class = _error_class(error_type)
-    info_path = os.path.join(bundle_path, "Contents", "Info.plist")
-    binary_path = os.path.join(bundle_path, "Contents", "MacOS", spec.executable)
+    info_path = join_path(bundle_path, "Contents", "Info.plist")
+    binary_path = join_path(bundle_path, "Contents", "MacOS", spec.executable)
 
     validate_regular_file(info_path, "Info.plist", error_class)
     validate_regular_file(binary_path, "kext binary", error_class)
@@ -336,6 +336,12 @@ def script_directory(module_file, error_type=None):
         return os.path.dirname(os.path.abspath(module_file))
     except (AttributeError, IOError, OSError, TypeError) as exc:
         raise _error_class(error_type)("cannot determine script directory: %s" % exc)
+
+
+def join_path(first, *parts):
+    """Join filesystem path parts while preserving native Python 2/3 path types."""
+    # noinspection PyTypeChecker
+    return os.path.join(first, *parts)
 
 
 def read_binary(path, error_type=None):
@@ -400,12 +406,12 @@ def bundle_payload_size(bundle_path, error_type=None):
     try:
         for root, dir_names, file_names in os.walk(bundle_path):
             for name in file_names:
-                file_path = os.path.join(root, name)
+                file_path = join_path(root, name)
                 entry_stat = os.lstat(file_path)
                 if stat.S_ISREG(entry_stat.st_mode) or stat.S_ISLNK(entry_stat.st_mode):
                     total += entry_stat.st_size
             for name in dir_names:
-                dir_path = os.path.join(root, name)
+                dir_path = join_path(root, name)
                 entry_stat = os.lstat(dir_path)
                 if stat.S_ISLNK(entry_stat.st_mode):
                     total += entry_stat.st_size

@@ -18,12 +18,13 @@ import shutil
 import sys
 import tempfile
 
-# The mixed-case internal module name is retained intentionally.
-# noinspection PyPep8Naming
+# The internal support modules intentionally use leading underscores.
+# noinspection PyPep8Naming,PyProtectedMember
 from _baselib import _baseRuntimeData as config
+# noinspection PyProtectedMember
 from _baselib._functions import (
     COLORS, FAIL, OK, detail, error_status,
-    exit_status, line, parse_args, print_basic_help, print_program_header, read_binary,
+    exit_status, join_path, line, parse_args, print_basic_help, print_program_header, read_binary,
     read_console_line, read_plist, script_directory as resolve_script_directory,
     section, set_color_enabled, set_error_type, sha256_data, sha256_file, status,
     terminal_supports_color, validate_kext_bundle_core, validate_regular_file,
@@ -122,8 +123,8 @@ def print_logo_and_select_target(script_dir, dry_run):
     line()
     detail("Selected target", target.display_name, indent=1, color=COLORS.green)
     detail("Expected source", target.source_build, indent=1)
-    detail("Source", os.path.join(script_dir, config.SOURCE_DIR_NAME), indent=1)
-    detail("Output", os.path.join(script_dir, config.OUTPUT_DIR_NAME), indent=1)
+    detail("Source", join_path(script_dir, config.SOURCE_DIR_NAME), indent=1)
+    detail("Output", join_path(script_dir, config.OUTPUT_DIR_NAME), indent=1)
     detail("Mode", "dry-run" if dry_run else "build", indent=1,
            color=COLORS.yellow if dry_run else COLORS.green)
     line()
@@ -165,7 +166,7 @@ def known_other_target(binary_hash, bundle_name, selected_target):
 
 
 def validate_bundle(source_dir, spec, target):
-    bundle_path = os.path.join(source_dir, spec.bundle)
+    bundle_path = join_path(source_dir, spec.bundle)
     if not os.path.exists(bundle_path):
         raise PatcherError("missing source kext: %s" % bundle_path)
     if os.path.islink(bundle_path):
@@ -173,8 +174,8 @@ def validate_bundle(source_dir, spec, target):
     if not os.path.isdir(bundle_path):
         raise PatcherError("source kext is not a directory: %s" % bundle_path)
 
-    preliminary_info = os.path.join(bundle_path, "Contents", "Info.plist")
-    preliminary_binary = os.path.join(bundle_path, "Contents", "MacOS", spec.executable)
+    preliminary_info = join_path(bundle_path, "Contents", "Info.plist")
+    preliminary_binary = join_path(bundle_path, "Contents", "MacOS", spec.executable)
     validate_regular_file(preliminary_info, "Info.plist")
     validate_regular_file(preliminary_binary, "kext binary")
     info = read_plist(preliminary_info)
@@ -391,9 +392,9 @@ def write_output(output_dir, prepared, target):
     try:
         temp_output = tempfile.mkdtemp(prefix=".hd5000-final-", dir=parent)
         for spec, result in prepared:
-            target_bundle = os.path.join(temp_output, spec.bundle)
+            target_bundle = join_path(temp_output, spec.bundle)
             copy_bundle(result["bundle_path"], target_bundle)
-            target_binary = os.path.join(target_bundle, "Contents", "MacOS", spec.executable)
+            target_binary = join_path(target_bundle, "Contents", "MacOS", spec.executable)
             validate_regular_file(target_binary, "copied kext binary")
             write_binary(target_binary, result["patched_data"])
 
@@ -411,11 +412,11 @@ def write_output(output_dir, prepared, target):
                     (spec.bundle, installed_hash, result["final_hash"])
                 )
 
-        write_ascii(os.path.join(temp_output, config.MANIFEST_NAME),
+        write_ascii(join_path(temp_output, config.MANIFEST_NAME),
                     create_manifest(target, prepared))
-        write_utf8(os.path.join(temp_output, config.REPORT_NAME),
+        write_utf8(join_path(temp_output, config.REPORT_NAME),
                    create_report(target, prepared))
-        write_ascii(os.path.join(temp_output, config.SUMS_NAME), create_sums(prepared))
+        write_ascii(join_path(temp_output, config.SUMS_NAME), create_sums(prepared))
 
         if os.path.lexists(output_dir):
             raise PatcherError("output appeared while patching: %s" % output_dir)
@@ -480,8 +481,8 @@ def main(argv):
     target = None
     try:
         script_dir = resolve_script_directory(__file__)
-        source_dir = os.path.join(script_dir, config.SOURCE_DIR_NAME)
-        output_dir = os.path.join(script_dir, config.OUTPUT_DIR_NAME)
+        source_dir = join_path(script_dir, config.SOURCE_DIR_NAME)
+        output_dir = join_path(script_dir, config.OUTPUT_DIR_NAME)
 
         target = print_logo_and_select_target(script_dir, dry_run)
         if target is None:

@@ -19,12 +19,13 @@ import shutil
 import subprocess
 import sys
 
-# The mixed-case internal module name is retained intentionally.
-# noinspection PyPep8Naming
+# The internal support modules intentionally use leading underscores.
+# noinspection PyPep8Naming,PyProtectedMember
 from _baselib import _baseRuntimeData as config
+# noinspection PyProtectedMember
 from _baselib._functions import (
     COLORS, FAIL, OK, bundle_payload_size, detail, error_status,
-    exit_status, finder_size_text, line, parse_args, print_program_header,
+    exit_status, finder_size_text, join_path, line, parse_args, print_program_header,
     prompt_enter_or_quit, read_console_line, read_plist,
     script_directory as resolve_script_directory, section, set_color_enabled,
     set_error_type, sha256_file, status, terminal_supports_color,
@@ -114,7 +115,7 @@ def print_intro(script_dir, target, dry_run, restore=False):
               "python %s --restore" % config.INSTALLER_SCRIPT_NAME + COLORS.default)
         line("  - please read %s before using restore" % config.README_NAME)
     line()
-    backup_dir = os.path.join(script_dir, target.backup_dir_name)
+    backup_dir = join_path(script_dir, target.backup_dir_name)
     line("Backup location:")
     detail("Path", backup_dir, indent=1)
     if restore:
@@ -141,7 +142,7 @@ def print_intro(script_dir, target, dry_run, restore=False):
     line()
     detail("Patch target", target.display_name, indent=1, color=COLORS.green)
     detail("Source", backup_dir if restore else
-           os.path.join(script_dir, config.OUTPUT_DIR_NAME), indent=1)
+           join_path(script_dir, config.OUTPUT_DIR_NAME), indent=1)
     detail("Target", config.SYSTEM_EXTENSIONS_DIR, indent=1)
     if restore:
         mode = "restore dry-run" if dry_run else "restore"
@@ -213,7 +214,7 @@ def parse_key_value_manifest(path, expected_header, label):
 
 
 def parse_manifest(output_dir):
-    manifest_path = os.path.join(output_dir, config.MANIFEST_NAME)
+    manifest_path = join_path(output_dir, config.MANIFEST_NAME)
     values = parse_key_value_manifest(
         manifest_path, "HD5000 DisplayPort patch manifest", "patch"
     )
@@ -258,20 +259,26 @@ def parse_manifest(output_dir):
     return target, manifest_path
 
 
-def validate_exact_output_kext_set(output_dir, target):
+def list_kext_bundle_names(directory, list_error_text):
+    """Return sorted .kext directory/link names from one validated container."""
     try:
-        entries = os.listdir(output_dir)
+        entries = os.listdir(directory)
     except (IOError, OSError) as exc:
-        raise InstallerError("cannot list patched output directory: %s" % exc)
+        raise InstallerError("%s: %s" % (list_error_text, exc))
 
     found = []
     for entry in entries:
         if not entry.endswith(".kext"):
             continue
-        path = os.path.join(output_dir, entry)
+        path = join_path(directory, entry)
         if os.path.isdir(path) or os.path.islink(path):
             found.append(entry)
     found.sort()
+    return found
+
+
+def validate_exact_output_kext_set(output_dir, target):
+    found = list_kext_bundle_names(output_dir, "cannot list patched output directory")
     expected = sorted([spec.bundle for spec in target.kexts])
     if found != expected:
         raise InstallerError(
@@ -284,7 +291,7 @@ def validate_exact_output_kext_set(output_dir, target):
 
 
 def validate_patched_bundle(output_dir, spec, target):
-    bundle_path = os.path.join(output_dir, spec.bundle)
+    bundle_path = join_path(output_dir, spec.bundle)
     if not os.path.exists(bundle_path):
         raise MissingPatchedOutputError("missing patched kext: %s" % bundle_path)
     if os.path.islink(bundle_path):
@@ -454,9 +461,9 @@ def validate_system_environment(target, dry_run):
 
 
 def system_bundle_info(spec, target):
-    bundle_path = os.path.join(config.SYSTEM_EXTENSIONS_DIR, spec.bundle)
-    info_path = os.path.join(bundle_path, "Contents", "Info.plist")
-    binary_path = os.path.join(bundle_path, "Contents", "MacOS", spec.executable)
+    bundle_path = join_path(config.SYSTEM_EXTENSIONS_DIR, spec.bundle)
+    info_path = join_path(bundle_path, "Contents", "Info.plist")
+    binary_path = join_path(bundle_path, "Contents", "MacOS", spec.executable)
 
     if not os.path.exists(bundle_path):
         raise InstallerError("installed system kext is missing: %s" % bundle_path)
@@ -610,7 +617,7 @@ def create_backup_manifest(target, records):
 
 
 def parse_backup_manifest(backup_dir, target):
-    manifest_path = os.path.join(backup_dir, config.BACKUP_MANIFEST_NAME)
+    manifest_path = join_path(backup_dir, config.BACKUP_MANIFEST_NAME)
     values = parse_key_value_manifest(
         manifest_path, "HD5000 system kext backup manifest", "backup"
     )
@@ -651,19 +658,7 @@ def parse_backup_manifest(backup_dir, target):
 
 
 def validate_exact_backup_kext_set(backup_dir, target):
-    try:
-        entries = os.listdir(backup_dir)
-    except (IOError, OSError) as exc:
-        raise InstallerError("cannot list backup directory: %s" % exc)
-
-    found = []
-    for entry in entries:
-        if not entry.endswith(".kext"):
-            continue
-        path = os.path.join(backup_dir, entry)
-        if os.path.isdir(path) or os.path.islink(path):
-            found.append(entry)
-    found.sort()
+    found = list_kext_bundle_names(backup_dir, "cannot list backup directory")
     expected = sorted([spec.bundle for spec in target.kexts])
     if found != expected:
         raise InstallerError(
@@ -675,9 +670,8 @@ def validate_exact_backup_kext_set(backup_dir, target):
 
 
 def backup_bundle_metadata(bundle_path, spec):
-    info_path = os.path.join(bundle_path, "Contents", "Info.plist")
-    # noinspection PyTypeChecker
-    binary_path = os.path.join(bundle_path, "Contents", "MacOS", spec.executable)
+    info_path = join_path(bundle_path, "Contents", "Info.plist")
+    binary_path = join_path(bundle_path, "Contents", "MacOS", spec.executable)
     validate_regular_file(info_path, "backup Info.plist")
     validate_regular_file(binary_path, "backup kext binary")
     info = read_plist(info_path)
@@ -697,7 +691,7 @@ def backup_bundle_metadata(bundle_path, spec):
 
 
 def validate_backup_bundle(backup_dir, spec, manifest_values=None):
-    bundle_path = os.path.join(backup_dir, spec.bundle)
+    bundle_path = join_path(backup_dir, spec.bundle)
     if not os.path.exists(bundle_path):
         raise InstallerError("missing backup kext: %s" % bundle_path)
     if os.path.islink(bundle_path):
@@ -800,7 +794,7 @@ def validate_backup_contents(backup_dir, target, show_output=False):
     if not os.path.isdir(backup_dir):
         raise InstallerError("backup path is not a directory: %s" % backup_dir)
 
-    manifest_path = os.path.join(backup_dir, config.BACKUP_MANIFEST_NAME)
+    manifest_path = join_path(backup_dir, config.BACKUP_MANIFEST_NAME)
     manifest_values = None
     if os.path.exists(manifest_path):
         manifest_values, manifest_path = parse_backup_manifest(backup_dir, target)
@@ -950,8 +944,8 @@ def create_verified_backup(backup_dir, target, dry_run, system_results=None):
         os.mkdir(temp_backup)
         records = {}
         for spec in target.kexts:
-            source = os.path.join(config.SYSTEM_EXTENSIONS_DIR, spec.bundle)
-            target_path = os.path.join(temp_backup, spec.bundle)
+            source = join_path(config.SYSTEM_EXTENSIONS_DIR, spec.bundle)
+            target_path = join_path(temp_backup, spec.bundle)
             status("Backing up %s." % spec.bundle, COLORS.default, indent=2)
             if command_exists("/usr/bin/ditto"):
                 run_command(["/usr/bin/ditto", source, target_path], capture=True)
@@ -962,14 +956,14 @@ def create_verified_backup(backup_dir, target, dry_run, system_results=None):
                 target_path, spec, expected[spec.bundle]
             )
 
-        manifest_path = os.path.join(temp_backup, config.BACKUP_MANIFEST_NAME)
+        manifest_path = join_path(temp_backup, config.BACKUP_MANIFEST_NAME)
         write_ascii(manifest_path, create_backup_manifest(target, records))
         validate_backup_contents(temp_backup, target, False)
         os.rename(temp_backup, backup_dir)
         status("Pre-install system backup created and verified.", COLORS.green,
                indent=1, symbol=OK)
         detail("Path", backup_dir, indent=2)
-        detail("Manifest", os.path.join(backup_dir, config.BACKUP_MANIFEST_NAME), indent=2)
+        detail("Manifest", join_path(backup_dir, config.BACKUP_MANIFEST_NAME), indent=2)
     # noinspection PyBroadException
     except (Exception, KeyboardInterrupt):
         if os.path.exists(temp_backup):
@@ -1009,10 +1003,10 @@ def obtain_admin_privileges(dry_run):
 
 
 def temp_paths(spec):
-    target_path = os.path.join(config.SYSTEM_EXTENSIONS_DIR, spec.bundle)
-    stage = os.path.join(config.SYSTEM_EXTENSIONS_DIR,
+    target_path = join_path(config.SYSTEM_EXTENSIONS_DIR, spec.bundle)
+    stage = join_path(config.SYSTEM_EXTENSIONS_DIR,
                          ".%s.hd5000-stage" % spec.bundle)
-    original = os.path.join(config.SYSTEM_EXTENSIONS_DIR,
+    original = join_path(config.SYSTEM_EXTENSIONS_DIR,
                             ".%s.hd5000-original" % spec.bundle)
     return target_path, stage, original
 
@@ -1117,7 +1111,7 @@ def newest_kernel_cache(target):
                 accepted = bool(suffix) and "." not in suffix
         if not accepted:
             continue
-        path = os.path.join(startup_dir, name)
+        path = join_path(startup_dir, name)
         if os.path.isfile(path) and not os.path.islink(path) and os.path.getsize(path) > 0:
             candidates.append(path)
 
@@ -1145,7 +1139,7 @@ def verify_cache_results(target):
 
     verified = [("Kernel cache", kernel_cache)]
     if target.key == "SL":
-        mkext_path = os.path.join(config.KEXT_CACHE_STARTUP_DIR,
+        mkext_path = join_path(config.KEXT_CACHE_STARTUP_DIR,
                                   config.SNOW_LEOPARD_MKEXT_NAME)
         if not os.path.isfile(mkext_path) or os.path.islink(mkext_path):
             raise InstallerError("Snow Leopard mkext cache is missing: %s" % mkext_path)
@@ -1246,7 +1240,7 @@ def confirm_real_restore(restore_prepared, target):
 
 def target_hint_from_output(output_dir):
     """Read only a non-authoritative target hint for the early UI header."""
-    manifest_path = os.path.join(output_dir, config.MANIFEST_NAME)
+    manifest_path = join_path(output_dir, config.MANIFEST_NAME)
     try:
         handle = open(manifest_path, "rb")
         try:
@@ -1274,7 +1268,7 @@ def restore_target_hint(script_dir):
     """Return a target hint only when exactly one backup directory exists."""
     found = []
     for target in config.TARGETS:
-        path = os.path.join(script_dir, target.backup_dir_name)
+        path = join_path(script_dir, target.backup_dir_name)
         if os.path.lexists(path):
             found.append(target)
     if len(found) == 1:
@@ -1285,7 +1279,7 @@ def restore_target_hint(script_dir):
 def select_restore_target(script_dir):
     available = []
     for target in config.TARGETS:
-        path = os.path.join(script_dir, target.backup_dir_name)
+        path = join_path(script_dir, target.backup_dir_name)
         if os.path.lexists(path):
             available.append((target, path))
 
@@ -1545,17 +1539,8 @@ def main(argv):
                        COLORS.light_red, indent=2)
 
             target_host = validate_system_environment(target, dry_run)
-            system_results = None
             if target_host:
                 system_state, system_results = validate_installed_system_kexts(target)
-            else:
-                section("system kext hashes")
-                status("System hash check skipped on this non-target restore dry-run host.",
-                       COLORS.light_red, indent=1)
-                status("On %s, restore dry-run verifies the current system hashes too." %
-                       target.display_name, COLORS.light_red, indent=1)
-
-            if target_host:
                 restore_state, restore_prepared = validate_restore_system_state(
                     system_state, system_results, backup_prepared
                 )
@@ -1574,6 +1559,11 @@ def main(argv):
                     line()
                     return 0
             else:
+                section("system kext hashes")
+                status("System hash check skipped on this non-target restore dry-run host.",
+                       COLORS.light_red, indent=1)
+                status("On %s, restore dry-run verifies the current system hashes too." %
+                       target.display_name, COLORS.light_red, indent=1)
                 restore_prepared = list(backup_prepared)
 
             print_restore_plan(backup_dir, target, dry_run, restore_prepared)
@@ -1599,8 +1589,8 @@ def main(argv):
                 return quit_before_system_changes()
 
             obtain_admin_privileges(False)
-            staged_paths_owned = True
             stage_bundles(restore_prepared, target, False, restore=True)
+            staged_paths_owned = True
             system_modified = True
             perform_operation(restore_prepared, target, False, restore=True)
             staged_paths_owned = False
@@ -1615,7 +1605,7 @@ def main(argv):
             restore_completion_text()
             return 0
 
-        output_dir = os.path.join(script_dir, config.OUTPUT_DIR_NAME)
+        output_dir = join_path(script_dir, config.OUTPUT_DIR_NAME)
         print_installer_header(target_hint_from_output(output_dir), restore=False)
         ensure_patched_output_dir(output_dir)
         target, manifest_path = parse_manifest(output_dir)
@@ -1634,10 +1624,9 @@ def main(argv):
                COLORS.green, indent=1, symbol=OK)
 
         prepared = validate_all_patched(output_dir, target)
-        backup_dir = os.path.join(script_dir, target.backup_dir_name)
+        backup_dir = join_path(script_dir, target.backup_dir_name)
 
         target_host = validate_system_environment(target, dry_run)
-        system_results = None
         if target_host:
             system_state, system_results = validate_installed_system_kexts(target)
             if system_state == "already_patched":
@@ -1655,6 +1644,7 @@ def main(argv):
                 line()
                 return 0
         else:
+            system_results = None
             section("system kext hashes")
             status("System hash check skipped on this non-target dry-run host.",
                    COLORS.light_red, indent=1)
@@ -1689,8 +1679,8 @@ def main(argv):
 
         obtain_admin_privileges(False)
         create_verified_backup(backup_dir, target, False, system_results)
-        staged_paths_owned = True
         stage_bundles(install_prepared, target, False, restore=False)
+        staged_paths_owned = True
         system_modified = True
         perform_operation(install_prepared, target, False, restore=False)
         staged_paths_owned = False
@@ -1722,7 +1712,6 @@ def main(argv):
         status("Interrupted by user.", COLORS.yellow, indent=2, symbol=FAIL)
         if staged_paths_owned and target is not None:
             cleanup_stage_paths(target, allow_failure=True)
-            staged_paths_owned = False
         if not system_modified:
             status("No system kexts were modified.", COLORS.yellow, indent=2)
         else:
@@ -1738,7 +1727,6 @@ def main(argv):
     except InstallerError as exc:
         if staged_paths_owned and target is not None:
             cleanup_stage_paths(target, allow_failure=True)
-            staged_paths_owned = False
         error_status(exc, indent=2)
         if not system_modified:
             status("No system kexts were modified.", COLORS.yellow, indent=2)
@@ -1758,7 +1746,6 @@ def main(argv):
     except Exception as exc:
         if staged_paths_owned and target is not None:
             cleanup_stage_paths(target, allow_failure=True)
-            staged_paths_owned = False
         error_status(exc, unexpected=True, indent=2)
         if not system_modified:
             status("No system kexts were modified.", COLORS.yellow, indent=2)
