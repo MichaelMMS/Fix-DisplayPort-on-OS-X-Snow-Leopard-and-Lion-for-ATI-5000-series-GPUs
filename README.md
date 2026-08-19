@@ -231,11 +231,11 @@ Comment:     ATI5000Controller DP PPLL 0xff fix - Lion 10.7.5
 Count:       1
 Enabled:     True
 Identifier:  com.apple.kext.ATI5000Controller
-Find:        41 80 FE 02 0F 87 8B 00 00 00 41 88 F7 49 89 FC 41 0F B6 F7 4C 89 E7
+Find:        4180FE020F878B0000004188F74989FC410FB6F74C89E7
 Mask:        <empty>
 MaxKernel:   11.99.99
 MinKernel:   11.0.0
-Replace:     44 88 F0 FE C0 3C 03 0F 87 88 00 00 00 41 89 F7 49 89 FC 90 90 90 90
+Replace:     4488F0FEC03C030F87880000004189F74989FC90909090
 ReplaceMask: <empty>
 Limit:       0
 Skip:        0
